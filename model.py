@@ -10,6 +10,7 @@ from sklearn.model_selection import train_test_split, LeaveOneOut
 from sklearn.preprocessing import StandardScaler
 from sklearn import metrics
 from scipy import stats
+from sklearn.decomposition import PCA
 
 
 # Load data
@@ -17,6 +18,10 @@ fileName = '/Users/Sam/Documents/Devolopment/ELEC409/Dataset_C_MD_outcome2.csv'
 data = pd.read_csv(fileName, usecols=[*range(2, 62)], header=None, skiprows=3)
 data_X = np.array(data)
 data_X = data_X.reshape(60,7129)
+
+# Principal component analysis
+# pca = PCA(n_components=2)
+# data_X = pca.fit_transform(data_X)
 
 # Create the array of class labels
 # 1 for non-responders and zero for responders
@@ -59,6 +64,11 @@ for train_index, test_index in loo.split(x_train):
 max_k = np.sum(max_score, axis=0)
 max_k_value = np.argmax(max_k)+1
 
-print(max_k_value)
+knn = KNeighborsClassifier(n_neighbors=max_k_value)
+knn.fit(x_train,y_train)
+y_pred = knn.predict(x_test)
+score_max = metrics.accuracy_score(y_test,y_pred)
+
+print(score_max)
 
 
