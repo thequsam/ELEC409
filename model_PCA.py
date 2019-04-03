@@ -32,9 +32,12 @@ data_Y = np.append(Y_1, Y_0)
 scaler = MinMaxScaler(feature_range=(0,1))
 data_X_norm = scaler.fit_transform(data_X)
 
-# Declare optimal values for K and the number of samples used
-k_value = 2
-num_samples = 78
+# Preform principle component analysis
+pca = PCA(n_components=2, svd_solver='full')
+PCA_X = pca.fit_transform(data_X_norm) 
+
+# Declare optimal values for K
+k_value = 7
 
 # Intialize range of random state and zero array's for p value and Matthews correlation coefficient
 j_range = range(1,100)
@@ -45,24 +48,28 @@ m_coeff = np.zeros(100)
 resp_count_test = np.zeros(100)
 resp_count_train = np.zeros(100)
 
+k_range = range(1,26)
+scores = {}
+scores_list = []
+max_score = np.zeros([100,26])
+
 for j in j_range:
-    # Keep only values of statistic significance 
-    data_X = SelectKBest(chi2, k=num_samples).fit_transform(data_X_norm, data_Y)
 
     # Create the testing and training sets split in half
     # Changing the random_state to a different number changes the random seed and therefore 
     # changes how the data is split into train and test sets
-    x_train, x_test, y_train, y_test = train_test_split(data_X, data_Y, test_size=0.5, random_state=j)
+    x_train, x_test, y_train, y_test = train_test_split(PCA_X, data_Y, test_size=0.5, random_state=j)
 
     # Count number of responders in test and train sets
     resp_count_test[j] = sum(y_test)
     resp_count_train[j] = sum(y_train)
 
-    # Train KNN on selected max k value
-    knn = KNeighborsClassifier(n_neighbors=k_value, weights='distance')
-    knn.fit(x_train,y_train)
-    y_pred = knn.predict(x_test)
-    score_max = metrics.accuracy_score(y_test,y_pred)
+    if resp_count_train[j] != (10 or 11):
+        continue
+
+    knn_pca = KNeighborsClassifier(n_neighbors=k_value, weights='distance')
+    knn_pca.fit(x_train,y_train)
+    y_pred = knn_pca.predict(x_test)
 
     # Compute contengency matrix, Fischers exact test ant Matthew's correlation coeffecient
     contingency_matrix = metrics.confusion_matrix(y_test,y_pred)
@@ -70,22 +77,26 @@ for j in j_range:
     m_coeff[j] = metrics.matthews_corrcoef(y_test,y_pred)
 
 
+p_value_z = []
+m_coeff_z = []
+
+for j in j_range:
+    if p_value[j] == 0:
+        continue
+    else:
+        p_value_z.append(p_value[j])
+        m_coeff_z.append(m_coeff[j])
+
 # Plot the p value and Matthews correlation coefficent changes with increasing number of gene samples
-plt.subplot(3, 1, 1)
-plt.plot(p_value, '.-')
+plt.subplot(2, 1, 1)
+plt.plot(p_value_z, '.-')
 plt.title('Measure of classification with varying random state')
 plt.ylabel('P value')
 
-plt.subplot(3, 1, 2)
-plt.plot(m_coeff, '.-')
+plt.subplot(2, 1, 2)
+plt.plot(m_coeff_z, '.-')
 plt.ylabel('Matthews correlation coefficient')
+plt.xlabel('Random state value')
 
-plt.subplot(3, 1, 3)
-plt.plot(resp_count_test, 'g.-', label='test set')
-plt.plot(resp_count_train, 'r.-', label='train set')
-plt.title('Number of non-responders in train and test set')
-plt.ylabel('Non-responders')
-plt.xlabel('Random state input')
-
-plt.subplots_adjust(hspace=0.35)
+plt.subplots_adjust(hspace=0.3)
 plt.show()

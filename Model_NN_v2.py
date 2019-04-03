@@ -1,5 +1,5 @@
 # ELEC 409 Final Assignment
-# Testing selected parameters
+# Building an CNN for classification
 # Sam Johnston 
 # Queen's University
 # 2019
@@ -14,6 +14,20 @@ from sklearn import metrics
 from scipy import stats
 from sklearn.decomposition import PCA
 import matplotlib.pyplot as plt
+
+import tensorflow as tf
+import os  
+from keras.models import Sequential, load_model
+from keras.optimizers import SGD
+from keras.layers import Dense, Flatten, Dropout, Reshape
+from keras.layers.convolutional import Conv1D, MaxPooling1D
+from keras.utils import to_categorical
+from sklearn.preprocessing import LabelEncoder,OneHotEncoder
+from keras import backend as K
+from keras.utils import np_utils
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' #Hide messy TensorFlow warnings
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 # Load data
 fileName = '/Users/Sam/Documents/Devolopment/ELEC409/Dataset_C_MD_outcome2.csv'
@@ -32,20 +46,80 @@ data_Y = np.append(Y_1, Y_0)
 scaler = MinMaxScaler(feature_range=(0,1))
 data_X_norm = scaler.fit_transform(data_X)
 
-# Declare optimal values for K and the number of samples used
-k_value = 2
-num_samples = 78
+# Declare the number of samples used
+num_samples = 1000
+
+# Create the testing and training sets split in half
+# Changing the random_state to a different number changes the random seed and therefore 
+# changes how the data is split into train and test sets
+data_X = SelectKBest(chi2, k=num_samples).fit_transform(data_X_norm, data_Y)
+
+x_train, x_test, y_train, y_test = train_test_split(data_X, data_Y, test_size=0.5, random_state=9)
+samples_train, genes_train = x_train.shape
+samples_test, genes_test = x_test.shape
+
+# Train a-NN
+# Model parameters
+epochs = 100
+batch_size = 1
+verbose = 1
+
+def build_model():
+    model = Sequential()
+    model.add(Dense(200, activation='relu', input_dim=genes_train))
+    model.add(Dropout(0.2))
+    model.add(Dense(100, activation='relu'))
+    model.add(Dropout(0.2))
+    model.add(Dense(100, activation='relu'))
+    model.add(Dropout(0.2))
+    model.add(Dense(50, activation='relu'))
+    model.add(Dropout(0.2))
+    model.add(Dense(1, activation='sigmoid'))
+    opt = SGD(lr=0.01, momentum=0.9)
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
+    
+    return model
+
+model = build_model()
+
+# Fit model
+model.fit(
+    x_train, 
+    y_train,
+    epochs=epochs,
+    batch_size=batch_size,
+    verbose=verbose
+)
+
+# Evaluate model
+_, accuracy = model.evaluate(
+    x_test, 
+    y_test, 
+    batch_size=batch_size, 
+    verbose=verbose
+)
+
+# Save model in HDF5 file
+model.save('ELEC490.h5')
+
+print('Accuracy of model:')
+print(accuracy*100.0)
+print('')
+
+# Number of random state iterations
+num_itr = 1000
 
 # Intialize range of random state and zero array's for p value and Matthews correlation coefficient
-j_range = range(1,100)
-p_value = np.zeros(100)
-m_coeff = np.zeros(100)
+j_range = range(1,num_itr)
+p_value = np.zeros(num_itr)
+m_coeff = np.zeros(num_itr)
 
 # Intialize arrays to count number of responders in test and train sets
-resp_count_test = np.zeros(100)
-resp_count_train = np.zeros(100)
+resp_count_test = np.zeros(num_itr)
+resp_count_train = np.zeros(num_itr)
 
 for j in j_range:
+
     # Keep only values of statistic significance 
     data_X = SelectKBest(chi2, k=num_samples).fit_transform(data_X_norm, data_Y)
 
@@ -61,11 +135,11 @@ for j in j_range:
     if resp_count_train[j] != (10 or 11):
         continue
 
-    # Train KNN on selected max k value
-    knn = KNeighborsClassifier(n_neighbors=k_value, weights='distance')
-    knn.fit(x_train,y_train)
-    y_pred = knn.predict(x_test)
-    score_max = metrics.accuracy_score(y_test,y_pred)
+    # x_test = x_test.swapaxes(1,0)
+    # print(x_test.shape)
+    # #Predict probability of each class
+
+    y_pred = model.predict_classes(x_test, batch_size=batch_size)
 
     # Compute contengency matrix, Fischers exact test ant Matthew's correlation coeffecient
     contingency_matrix = metrics.confusion_matrix(y_test,y_pred)

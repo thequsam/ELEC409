@@ -32,6 +32,10 @@ data_Y = np.append(Y_1, Y_0)
 scaler = MinMaxScaler(feature_range=(0,1))
 data_X_norm = scaler.fit_transform(data_X)
 
+# Preform principle component analysis
+pca = PCA(n_components=2, svd_solver='full')
+PCA_X = pca.fit_transform(data_X_norm) 
+
 j_range = range(50,200)
 p_value = np.zeros(150)
 m_coeff = np.zeros(150)
@@ -99,14 +103,23 @@ print(m_coeff[(m_coeff_max)-51])
 print(max_k_value)
 
 # Plot the p value and Matthews correlation coefficent changes with increasing number of gene samples
-plt.subplot(2, 1, 1)
-plt.plot(j_range, p_value, '.-')
-plt.title('Measure of classification with varying gene sample size')
-plt.ylabel('P value')
+fig1 = plt.figure()
+fig2 = plt.figure()
 
-plt.subplot(2, 1, 2)
-plt.plot(j_range, m_coeff, '.-')
-plt.xlabel('Number of Genes used')
-plt.ylabel('Matthews correlation coefficient')
+ax1 = fig1.add_subplot(2, 1, 1)
+ax1.plot(j_range, p_value, '.-')
+ax1.set_title('Measure of classification with varying gene sample size')
+ax1.set_ylabel('P value')
+
+ax2 = fig1.add_subplot(2, 1, 2)
+ax2.plot(j_range, m_coeff, '.-')
+ax2.set_xlabel('Number of Genes used')
+ax2.set_ylabel('Matthews correlation coefficient')
+
+ax3 = fig2.add_subplot(1, 1, 1)
+ax3.scatter(PCA_X[:,0],PCA_X[:,1])
+ax3.set_title('PCA')
+ax3.set_xlabel('X')
+ax3.set_ylabel('Y')
 
 plt.show()
